@@ -31,8 +31,9 @@ def main():
                 image = Image.open(io.BytesIO(task.data))
                 # you can further process the image here
                 # for example, make the background transparent
+                # image = rembg.remove(image)
                 image.save(filename+".tmp.png")
-                os.rename(filename+".tmp.png", filename) # save then rename to avoid partially-written files
+                os.replace(filename+".tmp.png", filename) # save then rename to avoid partially-written files
                 break
             else:
                 time.sleep(1)
