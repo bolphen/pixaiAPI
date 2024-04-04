@@ -1,8 +1,23 @@
 import requests
 import json
-import time
-import os
 from .payloads import *
+
+class PixaiTask:
+    def __init__(self, api, task_id):
+        self.api = api
+        self.task_id = task_id
+        self.url = None
+        self.data = None
+
+    def get_url(self):
+        if not self.url:
+            self.url = self.api._getTaskById(self.task_id)
+        return self.url
+
+    def get_data(self):
+        if not self.data and self.get_url():
+            self.data = requests.get(self.url).content
+        return self.data
 
 class PixaiAPI:
     def __init__(self, token):
@@ -13,16 +28,6 @@ class PixaiAPI:
             'Content-Type': "application/json"
         }
 
-        self.json_payload = {
-            'createGenerationTask': createGenerationTask,
-            'getTaskById': getTaskById
-        }
-
-    @classmethod
-    def load_json_payload(cls):
-        with open(cls.payloads_path, encoding='utf-8') as f:
-            return json.load(f)
-
     def send_request(self, payload):
         try:
             resp = requests.post(self.base_url, json=payload, headers=self.headers)
@@ -30,21 +35,31 @@ class PixaiAPI:
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
             return None 
-    
 
-    def createGenerationTask(self, prompts=None, steps=None, modelId=None, samplingMethod=None, cfgScale=None, width=None, height=None):
-        payload_string = self.json_payload['createGenerationTask']
-        payload = json.loads(payload_string)
+    def txt2img(self, prompts="1girl", steps=22, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000):
+        width, height = size
+        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority))
 
+    def img2img(self, filename, prompts="1girl", steps=22, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000, strength=0.65):
+        mediaId = self.upload(filename)
+        width, height = size
+        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, mediaId, strength))
+
+    def _createGenerationTask(self, prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, mediaId, strength):
+        payload = json.loads(CreateGenerationTask)
         parameters = payload['variables']['parameters']
 
-        parameters['prompts'] = prompts if prompts is not None else parameters['prompts']
-        parameters['samplingSteps'] = steps if steps is not None else parameters['samplingSteps']
-        parameters['modelId'] = modelId if modelId is not None else parameters['modelId']
-        parameters['samplingMethod'] = samplingMethod if samplingMethod is not None else parameters['samplingMethod']
-        parameters['cfgScale'] = cfgScale if cfgScale is not None else parameters['cfgScale']
-        parameters['width'] = width if width is not None else parameters['width']
-        parameters['height'] = height if height is not None else parameters['height']
+        parameters['prompts'] = prompts
+        parameters['samplingSteps'] = steps
+        parameters['modelId'] = str(modelId)
+        parameters['samplingMethod'] = samplingMethod
+        parameters['cfgScale'] = cfgScale
+        parameters['width'] = width
+        parameters['height'] = height
+        parameters['priority'] = priority
+        if mediaId:
+            parameters['mediaId'] = mediaId
+            parameters['strength'] = strength
 
         response = self.send_request(payload)
         
@@ -55,26 +70,37 @@ class PixaiAPI:
             print(f"Task ID: {task_id}" if task_id else "Failed to create task or get a response")
         return task_id
 
-    def getTaskById(self, task_id):
-        time.sleep(15)
-        payload = json.loads(self.json_payload['getTaskById'])
+    def _getTaskById(self, task_id):
+        payload = json.loads(GetTaskById)
         payload['variables']['id'] = task_id
         response = self.send_request(payload)
 
-        urls = response.get('data', {}).get('task', {}).get('media', {}).get('urls', [])
-        public_url = next((url_info['url'] for url_info in urls if url_info.get('variant') == "PUBLIC"), None)
+        media = response.get('data', {}).get('task', {})['media']
+        if media:
+            urls = media.get('urls', [])
+            return next((url_info['url'] for url_info in urls if url_info.get('variant') == "PUBLIC"), None)
 
-        return public_url
+    def upload(self, filename):
+        if filename == None:
+            return
+        uploadMedia = self._uploadMedia()
+        uploadUrl = uploadMedia.get('uploadUrl', None)
+        externalId = uploadMedia.get('externalId', None)
+        if uploadUrl and externalId:
+            with open(filename, 'rb') as file:
+                requests.put(uploadUrl, data=file.read(), headers={'Content-Type': "image/png"})
+            return self._uploadMedia(externalId).get('mediaId', None)
 
+    def _uploadMedia(self, externalId=None):
+        payload = json.loads(UploadMedia)
+        if externalId:
+            payload['variables']['input']["externalId"] = externalId
 
-    def DownloadImage(self, url):
-        filename = f"{os.path.splitext(os.path.basename(url))[0]}.png"
-        rimage = requests.get(url).content
-        with open(filename, 'wb') as file:
-            file.write(rimage)
-        return filename
+        response = self.send_request(payload)
+        return response.get('data', {}).get('uploadMedia', {})
 
     @staticmethod
     def _handle_error(response):
         print(f"Error: {response.status_code}, {response.text}")
         return None
+
