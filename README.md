@@ -1,52 +1,22 @@
-# 💬 Pixai.art
-
-![pixai-1651286186430165996-和風？](https://github.com/shidktbw/pixaiAPI/assets/112849918/68e99857-3851-428c-952f-1f256eefacba)
-
 An *unofficial* API for Pixai.art for Python using request
 
+Original authored by [shidktbw](https://github.com/shidktbw/pixaiAPI).
 
-## 💻 Installation
+This is my fork with img2img capability.
+
+The `repaint.py` accepts a png and some prompts, and then replaces the png with the generated image.
 ```bash
-pip install PixaiAPI
+repaint.py image.png "some prompts"
 ```
 
-
-## 🔑 Get Token
-The token is needed for authorization and operation of requests from your account
+There are three main options in `repaint.py` that you can change.
+- `token`: the token is needed for authorization and operation of requests from your account. I provided one from a throwaway account for testing purpose. Please replace it with your own. To obtain the token
 1. Open DevTools in your browser
 2. Go to Storage -> Local Storage -> `api.pixai.art:token`
 3. Copy `value`
 
- ᅠ 
-## 📙 Example
-```Python
-from pixai import PixaiAPI
+- `model`: models on pixai.art have urls of the form `pixai.art/model/12345/67890`. You should use the second number which refers to the specific version of a model.
 
-client = PixaiAPI('TOKEN')
+- `high_priority`: once you replaced the token with your own, you can set it to `True` for faster generation.
 
-startGeneration = client.createGenerationTask(
-    prompts='girl, white hair, winter',
-    steps='20',
-    modelId='1648918127446573124'
-)
-
-imageurlurl = client.getTaskById(startGeneration)
-image = client.DownloadImage(imageurlurl)
-```
-
-## ⛏️How is work (briefly)
-Due to the unofficial nature of the API, the approach to image generation deviates from standard methods
-
-1. Send `createGenerationTask` to initiate image generation
-2. Receive `generationId` as acknowledgment
-
-To track the progress or retrieve the generated image, use the getTaskById endpoint, passing in your generationId
-
-3. Use `getTaskById` with your `generationId` to get a link to the image
-4. Dowload image by link
-
-Workflow Summary
-createGenerationTask -> receive generationId -> getTaskById with generationId -> receive url_to_image -> Download image from link
-
-For all generation parameters check [it](https://github.com/shidktbw/pixaiAPI/blob/main/pixai/payloads.py#L5)
-
+**Note** If you want to use this for the Avatar mod, make sure `repaint.py` is executable and provide its full path in the settings of Avatar. You can then launch AI-gen tasks by right-clicking on the avatar, and they will show up in-game automatically once the generation has finished.
