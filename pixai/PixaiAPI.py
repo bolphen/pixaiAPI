@@ -34,18 +34,18 @@ class PixaiAPI:
             return resp.json() if resp.ok else self._handle_error(resp)
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
-            return None 
+            return None
 
-    def txt2img(self, prompts="1girl", steps=22, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000):
+    def txt2img(self, prompts="1girl", steps=20, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000, batchSize=1, lora=None):
         width, height = size
-        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority))
+        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, batchSize, lora))
 
-    def img2img(self, filename, prompts="1girl", steps=22, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000, strength=0.65):
+    def img2img(self, filename, prompts="1girl", steps=20, modelId=1647780283914444571, samplingMethod="DPM++ 2M Karras", cfgScale=6, size=(512, 512), priority=1000, strength=0.65, batchSize=1, lora=None):
         mediaId = self.upload(filename)
         width, height = size
-        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, mediaId, strength))
+        return PixaiTask(self, self._createGenerationTask(prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, batchSize, lora, mediaId, strength))
 
-    def _createGenerationTask(self, prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, mediaId, strength):
+    def _createGenerationTask(self, prompts, steps, modelId, samplingMethod, cfgScale, width, height, priority, batchSize, lora, mediaId=None, strength=None):
         payload = json.loads(CreateGenerationTask)
         parameters = payload['variables']['parameters']
 
@@ -57,12 +57,15 @@ class PixaiAPI:
         parameters['width'] = width
         parameters['height'] = height
         parameters['priority'] = priority
+        parameters['batchSize'] = batchSize
+        if lora:
+            parameters['lora'] = lora
         if mediaId:
             parameters['mediaId'] = mediaId
             parameters['strength'] = strength
 
         response = self.send_request(payload)
-        
+
         if "error" in response:
             print(f"Failed to create task due to error: {response['error'].get('message')}")
         else:
